@@ -1,9 +1,9 @@
 import React from 'react';
-
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase/config';
 import Icon from './Icon';
+import logo from '../assets/logo_webapp.png';
 
 const navItems = [
   { label: 'Dashboard', path: '/admin', icon: 'dashboard' },
@@ -24,9 +24,8 @@ const AdminSidebar = () => {
   return (
     <aside className="w-64 min-h-screen bg-white border-r flex flex-col">
       <div className="flex items-center px-6 py-6 border-b">
-        <div className="bg-blue-600 rounded-lg w-10 h-10 flex items-center justify-center mr-3">
-          <svg width="28" height="28" fill="none" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#2563eb"/></svg>
-        </div>
+        {/* Logo replacing the blue square */}
+        <img src={logo} alt="Bilixpress Logo" className="w-10 h-10 rounded-xl mr-3" />
         <div>
           <div className="font-bold text-lg text-gray-900">Bilixpress Admin</div>
         </div>

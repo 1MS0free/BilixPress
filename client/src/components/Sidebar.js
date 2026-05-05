@@ -3,8 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase/config';
 import Icon from './Icon';
-
-
+import logo from '../assets/logo_webapp.png';
 
 function getNavItems(user) {
   if (user?.role === 'shopper') {
@@ -29,6 +28,7 @@ function getNavItems(user) {
 }
 
 const adminNavItem = { label: 'Admin', path: '/admin', icon: 'settings' };
+
 const Sidebar = ({ user }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -43,9 +43,8 @@ const Sidebar = ({ user }) => {
   return (
     <aside className="w-64 min-h-screen bg-white border-r flex flex-col">
       <div className="flex items-center px-6 py-6 border-b">
-        <div className="bg-blue-600 rounded-full w-10 h-10 flex items-center justify-center text-white font-bold text-lg mr-3">
-          {user?.name ? user.name[0].toUpperCase() : 'D'}
-        </div>
+        {/* Logo replacing the blue circle */}
+        <img src={logo} alt="Bilixpress Logo" className="w-10 h-10 rounded-xl mr-3" />
         <div>
           <div className="font-semibold text-gray-900">Bilixpress</div>
           <div className="text-xs text-gray-500">{user?.name || 'Requester'}</div>
