@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import AdminLayout from '../../components/AdminLayout';
+import logo from '../../assets/logo_webapp.png'; // adjust path as needed
 
 const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
@@ -25,7 +26,16 @@ const AdminDashboard = () => {
 
   return (
     <AdminLayout>
-      <h2 className="text-2xl font-bold mb-6">Admin Dashboard</h2>
+
+      {/* Logo Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <img src={logo} alt="App Logo" className="h-14 w-14 rounded-2xl shadow" />
+        <div>
+          <h2 className="text-2xl font-bold">Admin Dashboard</h2>
+          <p className="text-gray-500 text-sm">Manage users, requests, and transactions.</p>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white rounded shadow p-6 flex flex-col items-center">
           <div className="text-2xl font-bold mb-1">{users.length}</div>
@@ -40,6 +50,7 @@ const AdminDashboard = () => {
           <div className="text-gray-500">Completed Transactions</div>
         </div>
       </div>
+
     </AdminLayout>
   );
 };
