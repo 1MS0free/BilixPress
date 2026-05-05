@@ -3,16 +3,35 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { useAuth } from '../hooks/useAuth';
 import Sidebar from '../components/Sidebar';
+import { Link } from 'react-router-dom';
+import { checkDuplicateRating } from '../services/ratingService';
+
+const statusColor = (status) => {
+  if (status === 'Accepted') return 'text-green-600 bg-green-50';
+  if (status === 'Completed') return 'text-blue-600 bg-blue-50';
+  return 'text-gray-600 bg-gray-100';
+};
 
 const MyRequestsPage = () => {
   const { user } = useAuth();
   const [requests, setRequests] = useState([]);
+  const [ratedMap, setRatedMap] = useState({});
 
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, 'requests'), where('requesterId', '==', user.uid));
-    const unsub = onSnapshot(q, (snapshot) => {
-      setRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsub = onSnapshot(q, async (snapshot) => {
+      const reqs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setRequests(reqs);
+
+      // Check which completed requests have already been rated
+      const rated = {};
+      await Promise.all(reqs.map(async (req) => {
+        if (req.status === 'Completed') {
+          rated[req.id] = await checkDuplicateRating(req.id, user.uid);
+        }
+      }));
+      setRatedMap(rated);
     });
     return () => unsub();
   }, [user]);
@@ -22,15 +41,57 @@ const MyRequestsPage = () => {
       <Sidebar user={user} />
       <main className="flex-1 p-10">
         <h2 className="text-2xl font-bold mb-6">My Requests</h2>
-        {requests.length === 0 ? <div>No requests yet</div> : (
-          <ul>
+        {requests.length === 0 ? (
+          <div className="text-gray-500">No requests yet.</div>
+        ) : (
+          <ul className="space-y-4">
             {requests.map(req => (
-              <li key={req.id} className="mb-4 p-4 border rounded">
-                <div className="font-semibold">{req.itemName}</div>
-                <div className="text-gray-600">Store: {req.storeName || 'N/A'}</div>
-                <div className="text-gray-600">Budget: ₱{req.budget}</div>
-                <div className="text-gray-600">Fee: ₱{req.convenienceFee}</div>
-                <div className="text-gray-600">Status: {req.status}</div>
+              <li key={req.id} className="bg-white rounded shadow p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex-1">
+                  <div className="font-semibold text-lg">{req.itemName}</div>
+                  <div className="text-gray-500 text-sm">Store: {req.storeName || 'N/A'}</div>
+                  <div className="text-gray-500 text-sm">Budget: ₱{req.budget} &nbsp;|&nbsp; Fee: ₱{req.convenienceFee}</div>
+                  <span className={`inline-block mt-1 text-xs font-semibold px-2 py-1 rounded-full ${statusColor(req.status)}`}>
+                    {req.status}
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-2 min-w-[160px]">
+                  {/* View Details always */}
+                  <Link
+                    to={`/request/${req.id}`}
+                    className="text-center bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 text-sm font-medium"
+                  >
+                    View Details
+                  </Link>
+
+                  {/* Chat button when Accepted or Completed */}
+                  {(req.status === 'Accepted' || req.status === 'Completed') && req.shopperId && (
+                    <Link
+                      to={`/chat/${req.id}`}
+                      className="text-center bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm font-medium"
+                    >
+                      💬 Chat with Shopper
+                    </Link>
+                  )}
+
+                  {/* Rate button when Completed and not yet rated */}
+                  {req.status === 'Completed' && req.shopperId && !ratedMap[req.id] && (
+                    <Link
+                      to={`/request/${req.id}#rate`}
+                      className="text-center bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 text-sm font-medium"
+                    >
+                      ⭐ Rate Shopper
+                    </Link>
+                  )}
+
+                  {/* Already rated */}
+                  {req.status === 'Completed' && ratedMap[req.id] && (
+                    <span className="text-center text-green-600 text-sm font-medium px-4 py-2 bg-green-50 rounded">
+                      ✓ Rated
+                    </span>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
