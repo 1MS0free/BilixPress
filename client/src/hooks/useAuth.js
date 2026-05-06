@@ -9,42 +9,48 @@ export function useAuth() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      try {
-        if (firebaseUser) {
-          // 1. Try to get data from Firestore
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          
-          let userData = { 
-            uid: firebaseUser.uid, 
-            email: firebaseUser.email, 
-            ...(userDoc.exists() ? userDoc.data() : {}) 
-          };
+      if (firebaseUser) {
+        try {
+          // Attempt to fetch custom profile (name, role) from Firestore
+          const userDocRef = doc(db, 'users', firebaseUser.uid);
+          const userDoc = await getDoc(userDocRef);
 
-          // 2. Cache the data in localStorage for "offline/blocked" situations
           if (userDoc.exists()) {
-            localStorage.setItem(`user_cache_${firebaseUser.uid}`, JSON.stringify(userData));
-          }
-
-          setUser(userData);
-        } else {
-          setUser(null);
-        }
-      } catch (err) {
-        console.warn("Firestore access blocked. Attempting to use cached profile.", err);
-        
-        if (firebaseUser) {
-          // 3. FALLBACK: Try to recover role from localStorage cache
-          const cachedData = localStorage.getItem(`user_cache_${firebaseUser.uid}`);
-          if (cachedData) {
-            setUser(JSON.parse(cachedData));
+            const fullUserData = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              displayName: firebaseUser.displayName,
+              ...userDoc.data(), // This spreads name, role, etc.
+            };
+            setUser(fullUserData);
+            // Save to local storage so the sidebar works even if Firestore is slow/blocked
+            localStorage.setItem('active_user_role', userDoc.data().role);
+            localStorage.setItem('active_user_name', userDoc.data().name || firebaseUser.displayName);
           } else {
-            // Last resort: basic info only
-            setUser({ uid: firebaseUser.uid, email: firebaseUser.email });
+            // No firestore doc found, use basic auth info
+            setUser({ 
+              uid: firebaseUser.uid, 
+              email: firebaseUser.email, 
+              name: firebaseUser.displayName || 'User',
+              role: 'requester' 
+            });
           }
+        } catch (err) {
+          console.error("Auth Hook Error:", err);
+          // Recovery: use local storage if the network/blocker killed the firestore request
+          setUser({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            name: localStorage.getItem('active_user_name') || 'User',
+            role: localStorage.getItem('active_user_role') || 'requester'
+          });
         }
-      } finally {
-        setLoading(false);
+      } else {
+        setUser(null);
+        localStorage.removeItem('active_user_role');
+        localStorage.removeItem('active_user_name');
       }
+      setLoading(false);
     });
 
     return () => unsubscribe();

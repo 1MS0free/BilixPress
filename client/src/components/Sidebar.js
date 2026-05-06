@@ -7,7 +7,10 @@ import Icon from './Icon';
 import logo from '../assets/logo_webapp.png';
 
 function getNavItems(user) {
-  if (user?.role === 'shopper') {
+  // ✅ FIX: Check both the user object AND localStorage as a backup
+  const role = user?.role || localStorage.getItem('active_user_role');
+
+  if (role === 'shopper') {
     return [
       { label: 'Dashboard',       path: '/dashboard',    icon: 'dashboard' },
       { label: 'Browse Requests', path: '/browse',       icon: 'list'      },
@@ -35,14 +38,14 @@ const Sidebar = ({ user }) => {
   const navigate  = useNavigate();
 
   // Notification state
-  const [hasNewAccepted, setHasNewAccepted] = useState(false); // dot on My Requests
-  const [hasNewMessage,  setHasNewMessage]  = useState(false); // dot on Messages
+  const [hasNewAccepted, setHasNewAccepted] = useState(false);
+  const [hasNewMessage,  setHasNewMessage]  = useState(false);
 
   useEffect(() => {
     if (!user?.uid) return;
+    const role = user?.role || localStorage.getItem('active_user_role');
 
-    // ── Requester: watch for newly Accepted requests ──────────────────────
-    if (user.role !== 'shopper') {
+    if (role !== 'shopper') {
       const q = query(
         collection(db, 'requests'),
         where('requesterId', '==', user.uid),
@@ -57,8 +60,6 @@ const Sidebar = ({ user }) => {
 
   useEffect(() => {
     if (!user?.uid) return;
-
-    // ── Both roles: watch for any message not sent by this user ──────────
     const q = query(
       collection(db, 'messages'),
       where('receiverId', '==', user.uid)
@@ -69,7 +70,6 @@ const Sidebar = ({ user }) => {
     return () => unsub();
   }, [user]);
 
-  // Clear dot when user visits the page
   useEffect(() => {
     if (location.pathname === '/my-requests') setHasNewAccepted(false);
     if (location.pathname === '/messages')    setHasNewMessage(false);
@@ -88,20 +88,21 @@ const Sidebar = ({ user }) => {
     return false;
   };
 
+  // ✅ Get the correct name and role for the UI
+  const displayName = user?.name || user?.displayName || localStorage.getItem('active_user_name') || 'User';
+  const displayRole = user?.role || localStorage.getItem('active_user_role') || 'requester';
+
   return (
     <aside className="w-64 min-h-screen bg-white border-r flex flex-col">
-
       {/* Brand Section */}
       <div className="flex items-center px-6 py-6 border-b">
         <img src={logo} alt="Bilixpress Logo" className="w-10 h-10 rounded-xl mr-3" />
         <div>
-          {/* Displays the User's name from Firebase or a default */}
           <div className="font-semibold text-gray-900 truncate w-32">
-            {user?.displayName || user?.name || 'User'}
+            {displayName}
           </div>
-          {/* Dynamic Role Label: Shopper, Admin, or Requester */}
           <div className="text-xs text-gray-500 capitalize">
-            {user?.role === 'shopper' ? 'Shopper' : user?.isAdmin ? 'Admin' : 'Requester'}
+            {displayRole === 'shopper' ? 'Shopper' : user?.isAdmin ? 'Admin' : 'Requester'}
           </div>
         </div>
       </div>
@@ -150,7 +151,6 @@ const Sidebar = ({ user }) => {
           <Icon name="logout" /> Logout
         </button>
       </div>
-
     </aside>
   );
 };
