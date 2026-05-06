@@ -2,9 +2,26 @@ import {
   doc,
   writeBatch,
   collection,
+  addDoc,
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
+
+// ✅ CREATE REQUEST
+export const createRequest = async (requestData) => {
+  try {
+    // We use addDoc here as it's a simple single-document creation
+    const docRef = await addDoc(collection(db, 'requests'), {
+      ...requestData,
+      status: 'Posted',
+      createdAt: serverTimestamp(),
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error("Error creating request:", error);
+    throw error;
+  }
+};
 
 // ✅ ACCEPT REQUEST (Optimized with Batches)
 export const acceptRequest = async (requestId, shopperId, requesterId) => {

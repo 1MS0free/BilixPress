@@ -1,214 +1,154 @@
-import React from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { useRequestDetails } from '../hooks/useRequestDetails';
-import { acceptRequest, completeRequest } from '../services/requestService';
+import { createRequest } from '../services/requestService';
 import Sidebar from '../components/Sidebar';
-import BackButton from '../components/BackButton';
-import RatingForm from '../components/RatingForm';
-import RequestChat from '../components/RequestChat';
 
-const RequestDetailsPage = () => {
-  const { id } = useParams();
-  const { user } = useAuth();
+const PostRequestPage = () => {
+  const navigate = useNavigate();
+  
+  // ✅ 1. Use the Nuclear-fixed hook for safety
+  const { user, loading: authLoading } = useAuth();
 
-  const {
-    request,
-    shopperRating,
-    requesterRating,
-    showRating,
-    hasRated,
-    setHasRated,
-    error,
-  } = useRequestDetails(id, user?.uid);
+  const [formData, setFormData] = useState({
+    itemName: '',
+    description: '',
+    storeName: '',
+    budget: '',
+    convenienceFee: '',
+  });
 
-  const handleAccept = async () => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ── NUCLEAR SAFETY CHECKS ──────────────────────────────────────────────────
+
+  // Check 1: Still verifying who the user is
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen bg-gray-50">
+        <Sidebar user={null} />
+        <main className="flex-1 p-10">Verifying session...</main>
+      </div>
+    );
+  }
+
+  // Check 2: No user found (User must be logged in to post)
+  if (!user) {
+    return (
+      <div className="flex min-h-screen bg-gray-50">
+        <Sidebar user={null} />
+        <main className="flex-1 p-10 text-red-500">
+          <p className="font-bold">Access Denied</p>
+          <p>Please log in to create a new request.</p>
+        </main>
+      </div>
+    );
+  }
+
+  // ── FORM LOGIC ─────────────────────────────────────────────────────────────
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
     try {
-      await acceptRequest(id, user.uid);
-      // No navigate() — stay here, onSnapshot updates UI automatically
-    } catch (err) {
-      console.error('Failed to accept request:', err);
+      await createRequest({
+        ...formData,
+        requesterId: user.uid,
+        requesterEmail: user.email,
+        status: 'Posted',
+        createdAt: new Date(),
+      });
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Error creating request:', error);
+      alert('Failed to post request. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleComplete = async () => {
-    try {
-      await completeRequest(id);
-    } catch (err) {
-      console.error('Failed to complete request:', err);
-    }
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
-
-  if (error)    return <div className="p-8 text-red-500">{error}</div>;
-  if (!request) return <div className="p-8">Loading...</div>;
-
-  const isRequester = user?.uid === request.requesterId;
-  const isShopper   = user?.uid === request.shopperId;
-  const isPosted    = request.status === 'Posted';
-  const isAccepted  = request.status === 'Accepted';
-  const isCompleted = request.status === 'Completed';
-
-  // The other person in the chat
-  const chatReceiverId = isRequester ? request.shopperId : request.requesterId;
 
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar user={user} />
 
-      <main className="flex-1 p-10 flex gap-8">
-
-        {/* ── Left: Request Details ─────────────────────────────────────── */}
-        <div className="flex-1 max-w-2xl">
-          <BackButton />
-
-          <div className="bg-white rounded shadow p-6 mb-6">
-
-            {/* Header */}
-            <div className="flex items-center mb-4">
-              <span className="inline-block bg-blue-100 text-blue-600 rounded-full p-2 mr-2">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-                  <rect width="24" height="24" rx="6" fill="#2563eb" />
-                </svg>
-              </span>
-              <h2 className="text-2xl font-bold">{request.itemName}</h2>
+      <main className="flex-1 p-10">
+        <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-md p-8">
+          <h2 className="text-3xl font-bold text-gray-800 mb-6">Post a New Request</h2>
+          
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Item Name</label>
+              <input
+                type="text"
+                name="itemName"
+                required
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                onChange={handleChange}
+              />
             </div>
 
-            {/* Info fields */}
-            <div className="space-y-1 text-sm text-gray-700 mb-4">
-              <p>Description: {request.description || 'N/A'}</p>
-              <p>Store: {request.storeName || 'N/A'}</p>
-              <p>Budget: ₱{request.budget}</p>
-              <p>Convenience Fee: ₱{request.convenienceFee}</p>
-              <p>
-                Status:{' '}
-                <span className="font-semibold">{request.status}</span>
-              </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Store Name (Optional)</label>
+              <input
+                type="text"
+                name="storeName"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                onChange={handleChange}
+              />
             </div>
 
-            {/* Ratings row */}
-            <div className="flex gap-6 mb-4 text-sm text-yellow-600">
-              {request.shopperId && (
-                <span>
-                  Shopper Rating:{' '}
-                  <strong>
-                    {shopperRating !== null ? `★ ${shopperRating.toFixed(2)}` : 'N/A'}
-                  </strong>
-                </span>
-              )}
-              {request.requesterId && (
-                <span>
-                  Requester Rating:{' '}
-                  <strong>
-                    {requesterRating !== null ? `★ ${requesterRating.toFixed(2)}` : 'N/A'}
-                  </strong>
-                </span>
-              )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Description / Details</label>
+              <textarea
+                name="description"
+                rows="3"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                onChange={handleChange}
+              ></textarea>
             </div>
 
-            {/* ── Requester POV ───────────────────────────────────────────── */}
-            {isRequester && (
-              <>
-                {isPosted && (
-                  <p className="mt-4 text-sm text-gray-400 italic">
-                    ⏳ Waiting for a shopper to accept your request...
-                  </p>
-                )}
-                {isAccepted && (
-                  <p className="mt-4 text-sm text-blue-600 font-medium">
-                    ✓ A shopper has accepted your request. You can now chat with them →
-                  </p>
-                )}
-                {isCompleted && (
-                  <p className="mt-4 text-sm text-green-600 font-medium">
-                    ✓ This request has been completed.
-                  </p>
-                )}
-              </>
-            )}
-
-            {/* ── Shopper POV ─────────────────────────────────────────────── */}
-            {!isRequester && (
-              <>
-                {isPosted && (
-                  <button
-                    onClick={handleAccept}
-                    className="mt-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-                  >
-                    Accept Request
-                  </button>
-                )}
-                {isAccepted && isShopper && (
-                  <button
-                    onClick={handleComplete}
-                    className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                  >
-                    Mark as Done
-                  </button>
-                )}
-              </>
-            )}
-
-            {/* ── Rating (both sides, Completed only) ─────────────────────── */}
-            {isCompleted && showRating && (
-              <div className="mt-8" id="rate">
-                {hasRated ? (
-                  <p className="text-green-600 font-semibold">
-                    ✓ You have already rated this transaction.
-                  </p>
-                ) : (
-                  <>
-                    <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
-                      <span className="bg-yellow-100 text-yellow-600 rounded-full p-1">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                          <path
-                            d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2
-                               9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
-                            fill="#facc15"
-                          />
-                        </svg>
-                      </span>
-                      {isRequester ? 'Rate the Shopper' : 'Rate the Requester'}
-                    </h3>
-                    <RatingForm
-                      requestId={request.id}
-                      reviewerId={user.uid}
-                      revieweeId={isRequester ? request.shopperId : request.requesterId}
-                      onRated={() => setHasRated(true)}
-                    />
-                  </>
-                )}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Item Budget (₱)</label>
+                <input
+                  type="number"
+                  name="budget"
+                  required
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                  onChange={handleChange}
+                />
               </div>
-            )}
-
-          </div>
-        </div>
-
-        {/* ── Right: Chat ──────────────────────────────────────────────────── */}
-        <div className="w-full max-w-sm bg-white rounded shadow p-6 flex flex-col h-fit self-start">
-          <h3 className="text-lg font-bold mb-4">
-            {isAccepted || isCompleted ? '💬 Messages' : 'Messages'}
-          </h3>
-
-          {isAccepted || isCompleted ? (
-            <RequestChat
-              requestId={id}
-              user={user}
-              receiverId={chatReceiverId}
-              disabled={isCompleted}
-            />
-          ) : (
-            <div className="flex flex-col items-center justify-center h-48 text-center text-gray-400 text-sm italic">
-              <span className="text-3xl mb-2">💬</span>
-              {isRequester
-                ? 'Chat opens once a shopper accepts your request.'
-                : 'Chat opens once you accept this request.'}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Convenience Fee (₱)</label>
+                <input
+                  type="number"
+                  name="convenienceFee"
+                  required
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                  onChange={handleChange}
+                />
+              </div>
             </div>
-          )}
-        </div>
 
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={`w-full py-3 px-4 rounded-md text-white font-bold transition ${
+                isSubmitting ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700 shadow-lg'
+              }`}
+            >
+              {isSubmitting ? 'Posting...' : 'Confirm and Post Request'}
+            </button>
+          </form>
+        </div>
       </main>
     </div>
   );
 };
 
-export default RequestDetailsPage;
+export default PostRequestPage;
