@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { db } from '../firebase/config';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import Sidebar from '../components/Sidebar';
-// NEW: Professional Icons
+// Professional Icons from Lucide
 import { 
   LayoutDashboard, 
   Package, 
@@ -20,6 +20,7 @@ const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
+  // State for stats and ratings
   const [activeItemsList, setActiveItemsList] = useState([]); 
   const [completedCount, setCompletedCount] = useState(0);
   const [avgRating, setAvgRating] = useState("0.00");
@@ -27,9 +28,11 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (!user?.uid) return;
+
     const role = user?.role || localStorage.getItem('active_user_role');
     const isShopperRole = role === 'shopper';
 
+    // 1. Fetch Active and Completed Requests
     let qActive, qComp;
     if (isShopperRole) {
       qActive = query(collection(db, 'requests'), where('shopperId', '==', user.uid), where('status', '==', 'Accepted'));
@@ -41,6 +44,8 @@ const Dashboard = () => {
 
     const unsubActive = onSnapshot(qActive, (s) => setActiveItemsList(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubComp = onSnapshot(qComp, (s) => setCompletedCount(s.docs.length));
+
+    // 2. Calculate Live Rating Average
     const qRatings = query(collection(db, 'ratings'), where('revieweeId', '==', user.uid));
     
     const unsubRatings = onSnapshot(qRatings, (snapshot) => {
@@ -50,12 +55,17 @@ const Dashboard = () => {
         setAvgRating((total / ratingsArray.length).toFixed(2));
         setTotalReviews(ratingsArray.length);
       } else {
+        // Fallback to profile data if no ratings documents exist
         setAvgRating(user?.rating ? Number(user.rating).toFixed(2) : "0.00");
         setTotalReviews(user?.reviewCount || 0);
       }
     });
 
-    return () => { unsubActive(); unsubComp(); unsubRatings(); };
+    return () => { 
+      unsubActive(); 
+      unsubComp(); 
+      unsubRatings(); 
+    };
   }, [user]);
 
   if (authLoading) return null;
@@ -63,20 +73,20 @@ const Dashboard = () => {
   const isShopper = (user?.role || localStorage.getItem('active_user_role')) === 'shopper';
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC]"> {/* Slate-50 background */}
+    <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar user={user} />
 
       <main className="flex-1 p-8 max-w-6xl mx-auto">
         <header className="mb-10">
           <div className="flex items-center gap-3 mb-2">
-            <LayoutDashboard className="w-6 h-6 text-indigo-600" />
-            <span className="text-sm font-semibold uppercase tracking-wider text-indigo-600">Overview</span>
+            <LayoutDashboard className="w-5 h-5 text-indigo-600" />
+            <span className="text-xs font-bold uppercase tracking-widest text-indigo-600 font-sans">Overview</span>
           </div>
-          <h1 className="text-3xl font-bold text-slate-900">
-            Welcome back, {user?.name || 'User'}!
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+            Welcome back, <span className="text-indigo-600">{user?.name || 'User'}</span>!
           </h1>
-          <p className="text-slate-500 mt-1">
-            {isShopper ? "Check your latest tasks and delivery updates." : "Review your active requests and shopper messages."}
+          <p className="text-slate-500 mt-1 text-lg">
+            {isShopper ? "Ready to help someone today?" : "Manage your shopping requests here."}
           </p>
         </header>
 
@@ -142,9 +152,9 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* LIST SECTION */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+        {/* ACTIVE LIST SECTION */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-10">
+          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
             <h3 className="font-bold text-slate-800 flex items-center gap-2">
               <Package className="w-4 h-4 text-slate-400" />
               {isShopper ? 'Active Tasks' : 'Active Requests'}
@@ -181,7 +191,7 @@ const Dashboard = () => {
             ) : (
               <div className="text-center py-12">
                 <Package className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-                <p className="text-slate-400 italic">No active {isShopper ? 'tasks' : 'requests'} at the moment.</p>
+                <p className="text-slate-400 italic">No active items found.</p>
               </div>
             )}
           </div>
@@ -191,12 +201,12 @@ const Dashboard = () => {
   );
 };
 
-// Reusable Professional Components
+// Reusable Components
 const StatCard = ({ label, value, icon, subValue, color }) => (
-  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-indigo-200 transition-all">
+  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm transition-all hover:border-indigo-200">
     <div className="flex justify-between items-start">
       <div>
-        <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">{label}</p>
         <h2 className="text-3xl font-black text-slate-900">{value}</h2>
       </div>
       <div className={`p-2 rounded-lg bg-${color}-50`}>
