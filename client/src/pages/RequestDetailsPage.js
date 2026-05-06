@@ -24,22 +24,17 @@ const RequestDetailsPage = () => {
     error,
   } = useRequestDetails(id, user?.uid);
 
-  // Updated handleAccept to pass requesterId
   const handleAccept = async () => {
     if (!request || !user) return;
-
     try {
       await acceptRequest(id, user.uid, request.requesterId);
-      // Stay on this page — onSnapshot updates UI automatically
     } catch (err) {
       console.error('Failed to accept request:', err);
     }
   };
 
-  // Updated handleComplete to pass both shopperId and requesterId
   const handleComplete = async () => {
     if (!request) return;
-
     try {
       await completeRequest(
         id,
@@ -51,19 +46,53 @@ const RequestDetailsPage = () => {
     }
   };
 
-  // ✅ Wait for auth AND request before computing roles
-  if (authLoading)  return <div className="p-8">Loading...</div>;
-  if (error)         return <div className="p-8 text-red-500">{error}</div>;
-  if (!request)      return <div className="p-8">Loading...</div>;
+  // ── NUCLEAR SAFETY CHECKS ──────────────────────────────────────────────────
+  
+  // 1. If auth is still loading, wait here.
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-lg font-medium">Verifying Credentials...</p>
+          <p className="text-sm text-gray-400">Ensuring you are logged in.</p>
+        </div>
+      </div>
+    );
+  }
 
-  // ✅ These are now computed AFTER user is guaranteed to be loaded
+  // 2. If the database request threw an error (like a block or permission issue)
+  if (error) {
+    return (
+      <div className="p-8 text-center">
+        <div className="bg-red-50 text-red-600 p-4 rounded-lg inline-block border border-red-200">
+          <p className="font-bold">Access Blocked</p>
+          <p className="text-sm">{error}</p>
+          <p className="text-xs mt-2 italic text-red-400">Check if your browser's ad-blocker is blocking Firebase.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. If we have a user but the specific request data isn't here yet
+  if (!request) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-lg font-medium">Fetching Request Details...</p>
+          <p className="text-sm text-gray-400">Almost there!</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── LOGIC ──────────────────────────────────────────────────────────────────
+
   const isRequester = user?.uid === request.requesterId;
   const isShopper   = user?.uid === request.shopperId;
   const isPosted    = request.status === 'Posted';
   const isAccepted  = request.status === 'Accepted';
   const isCompleted = request.status === 'Completed';
 
-  // The other person in the conversation
   const chatReceiverId = isRequester ? request.shopperId : request.requesterId;
 
   return (
@@ -78,7 +107,6 @@ const RequestDetailsPage = () => {
 
           <div className="bg-white rounded shadow p-6 mb-6">
 
-            {/* Header */}
             <div className="flex items-center mb-4">
               <span className="inline-block bg-blue-100 text-blue-600 rounded-full p-2 mr-2">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
@@ -88,7 +116,6 @@ const RequestDetailsPage = () => {
               <h2 className="text-2xl font-bold">{request.itemName}</h2>
             </div>
 
-            {/* Info fields */}
             <div className="space-y-1 text-sm text-gray-700 mb-4">
               <p>Description: {request.description || 'N/A'}</p>
               <p>Store: {request.storeName || 'N/A'}</p>
@@ -100,7 +127,6 @@ const RequestDetailsPage = () => {
               </p>
             </div>
 
-            {/* Ratings row */}
             <div className="flex gap-6 mb-4 text-sm text-yellow-600">
               {request.shopperId && (
                 <span>
@@ -120,7 +146,6 @@ const RequestDetailsPage = () => {
               )}
             </div>
 
-            {/* ── Requester POV ───────────────────────────────────────────── */}
             {isRequester && (
               <>
                 {isPosted && (
@@ -141,7 +166,6 @@ const RequestDetailsPage = () => {
               </>
             )}
 
-            {/* ── Shopper POV ─────────────────────────────────────────────── */}
             {!isRequester && (
               <>
                 {isPosted && (
@@ -163,7 +187,6 @@ const RequestDetailsPage = () => {
               </>
             )}
 
-            {/* ── Rating (both sides, Completed only) ─────────────────────── */}
             {isCompleted && showRating && (
               <div className="mt-8" id="rate">
                 {hasRated ? (
@@ -184,17 +207,18 @@ const RequestDetailsPage = () => {
                       </span>
                       {isRequester ? 'Rate the Shopper' : 'Rate the Requester'}
                     </h3>
-                    <RatingForm
-                      requestId={request.id}
-                      reviewerId={user.uid}
-                      revieweeId={isRequester ? request.shopperId : request.requesterId}
-                      onRated={() => setHasRated(true)}
-                    />
+                    {user && (
+                      <RatingForm
+                        requestId={request.id}
+                        reviewerId={user.uid}
+                        revieweeId={isRequester ? request.shopperId : request.requesterId}
+                        onRated={() => setHasRated(true)}
+                      />
+                    )}
                   </>
                 )}
               </div>
             )}
-
           </div>
         </div>
 
@@ -220,7 +244,6 @@ const RequestDetailsPage = () => {
             </div>
           )}
         </div>
-
       </main>
     </div>
   );
