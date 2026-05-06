@@ -1,5 +1,6 @@
 import {
   doc,
+  getDoc,
   writeBatch,
   collection,
   addDoc,
@@ -7,10 +8,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
-// ✅ CREATE REQUEST
 export const createRequest = async (requestData) => {
   try {
-    // We use addDoc here as it's a simple single-document creation
     const docRef = await addDoc(collection(db, 'requests'), {
       ...requestData,
       status: 'Posted',
@@ -23,15 +22,16 @@ export const createRequest = async (requestData) => {
   }
 };
 
-// ✅ ACCEPT REQUEST (Optimized with Batches)
 export const acceptRequest = async (requestId, shopperId, requesterId) => {
-  if (!requestId || !shopperId || !requesterId) {
-    throw new Error('Missing required parameters.');
-  }
+  if (!requestId || !shopperId || !requesterId) throw new Error('Missing parameters.');
+
+  // 1. Fetch Shopper details for the FoodPanda-style message
+  const shopperSnap = await getDoc(doc(db, 'users', shopperId));
+  const shopperData = shopperSnap.exists() ? shopperSnap.data() : {};
 
   const batch = writeBatch(db);
 
-  // 1. Reference for the request document
+  // 2. Update Request Status
   const requestRef = doc(db, 'requests', requestId);
   batch.update(requestRef, {
     status: 'Accepted',
@@ -39,48 +39,45 @@ export const acceptRequest = async (requestId, shopperId, requesterId) => {
     acceptedAt: serverTimestamp(),
   });
 
-  // 2. Reference for a new system message
+  // 3. Create Automated System Message
   const messageRef = doc(collection(db, 'messages'));
+  const autoMessage = `🤖 SYSTEM: Your request has been accepted by ${shopperData.name || 'a shopper'}.
+  
+🪪 School ID: ${shopperData.schoolId || 'N/A'}
+📞 Number: ${shopperData.phoneNumber || 'N/A'}
+
+You can now coordinate your delivery here!`;
+
   batch.set(messageRef, {
     requestId,
-    senderId: shopperId,
+    senderId: 'system',
     receiverId: requesterId,
-    text: '✅ Request accepted. You can now start chatting.',
+    text: autoMessage,
     createdAt: serverTimestamp(),
     system: true,
   });
 
-  // 3. Commit both updates in one network trip
   await batch.commit();
 };
 
-// ✅ COMPLETE REQUEST (Optimized with Batches)
 export const completeRequest = async (requestId, shopperId, requesterId) => {
-  if (!requestId) {
-    throw new Error('Missing requestId.');
-  }
-
+  if (!requestId) throw new Error('Missing requestId.');
   const batch = writeBatch(db);
 
-  // 1. Mark as completed
-  const requestRef = doc(db, 'requests', requestId);
-  batch.update(requestRef, {
+  batch.update(doc(db, 'requests', requestId), {
     status: 'Completed',
     completedAt: serverTimestamp(),
   });
 
-  // 2. Notify both users via system message
   if (shopperId && requesterId) {
-    const messageRef = doc(collection(db, 'messages'));
-    batch.set(messageRef, {
+    batch.set(doc(collection(db, 'messages')), {
       requestId,
-      senderId: shopperId,
+      senderId: 'system',
       receiverId: requesterId,
       text: '🎉 Request completed. Please leave a rating!',
       createdAt: serverTimestamp(),
       system: true,
     });
   }
-
   await batch.commit();
 };

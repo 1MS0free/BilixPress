@@ -2,81 +2,60 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { db } from '../firebase/config';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
 import Sidebar from '../components/Sidebar';
 
 const Dashboard = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user: authUser, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
-  const [activeRequests, setActiveRequests] = useState([]); // User as Requester
-  const [activeTasks, setActiveTasks] = useState([]);       // User as Shopper
+  const [userData, setUserData] = useState(null); // Real-time user stats
+  const [activeRequests, setActiveRequests] = useState([]);
+  const [activeTasks, setActiveTasks] = useState([]);
   const [completedCount, setCompletedCount] = useState(0);
 
   useEffect(() => {
-    if (!user) return;
+    if (!authUser) return;
 
-    // 1. Requests you posted (Requester Role)
-    const qRequests = query(
-      collection(db, 'requests'),
-      where('requesterId', '==', user.uid),
-      where('status', 'in', ['Posted', 'Accepted'])
-    );
-
-    // 2. Tasks you accepted (Shopper Role)
-    const qTasks = query(
-      collection(db, 'requests'),
-      where('shopperId', '==', user.uid),
-      where('status', '==', 'Accepted')
-    );
-
-    const unsubRequests = onSnapshot(qRequests, (snapshot) => {
-      setActiveRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    // 1. Real-time listener for USER RATING & PROFILE
+    const unsubUser = onSnapshot(doc(db, 'users', authUser.uid), (snap) => {
+      if (snap.exists()) setUserData(snap.data());
     });
 
-    const unsubTasks = onSnapshot(qTasks, (snapshot) => {
-      setActiveTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    // 2. Requests/Tasks Listeners
+    const qRequests = query(collection(db, 'requests'), where('requesterId', '==', authUser.uid), where('status', 'in', ['Posted', 'Accepted']));
+    const qTasks = query(collection(db, 'requests'), where('shopperId', '==', authUser.uid), where('status', '==', 'Accepted'));
+    
+    const unsubReq = onSnapshot(qRequests, (s) => setActiveRequests(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubTsk = onSnapshot(qTasks, (s) => setActiveTasks(s.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-    // 3. Overall Completed Count
-    const qCompleted = query(
-      collection(db, 'requests'),
-      where('status', '==', 'Completed')
-    );
-
-    const unsubCompleted = onSnapshot(qCompleted, (snapshot) => {
-      const docs = snapshot.docs.map(doc => doc.data());
-      const count = docs.filter(d => d.requesterId === user.uid || d.shopperId === user.uid).length;
+    // 3. Completed Count Listener
+    const qComp = query(collection(db, 'requests'), where('status', '==', 'Completed'));
+    const unsubComp = onSnapshot(qComp, (s) => {
+      const count = s.docs.filter(d => d.data().requesterId === authUser.uid || d.data().shopperId === authUser.uid).length;
       setCompletedCount(count);
     });
 
-    return () => {
-      unsubRequests();
-      unsubTasks();
-      unsubCompleted();
-    };
-  }, [user]);
+    return () => { unsubUser(); unsubReq(); unsubTsk(); unsubComp(); };
+  }, [authUser]);
 
   if (authLoading) return <div className="p-10">Loading...</div>;
-  if (!user) return <div className="p-10 text-red-500">Please log in.</div>;
+  if (!authUser) return <div className="p-10 text-red-500">Please log in.</div>;
 
-  // --- RATING LOGIC ---
-  const displayRating = user.rating ? Number(user.rating).toFixed(2) : "5.00";
-  const displayCount = user.reviewCount || 0;
+  const displayRating = userData?.rating ? Number(userData.rating).toFixed(2) : "0.00";
+  const displayCount = userData?.reviewCount || 0;
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <Sidebar user={user} />
-
+      <Sidebar user={userData || authUser} />
       <main className="flex-1 p-10">
         <header className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800">
-            Welcome back, {user.name || user.displayName || 'User'}!
+            Welcome back, {userData?.name || authUser.displayName || 'User'}!
           </h1>
           <p className="text-gray-500 italic">Ready to help someone today?</p>
         </header>
 
-        {/* Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 text-center">
             <p className="text-4xl font-bold text-blue-600">{activeRequests.length + activeTasks.length}</p>
@@ -89,72 +68,20 @@ const Dashboard = () => {
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 text-center">
             <p className="text-4xl font-bold text-yellow-500">{displayRating}</p>
             <p className="text-gray-500 font-medium">Rating</p>
-            {/* NEW: REVIEWS COUNT DISPLAY */}
-            <p className="text-xs text-gray-400 mt-1 italic">
-              Based on {displayCount} {displayCount === 1 ? 'review' : 'reviews'}
-            </p>
+            <p className="text-xs text-gray-400 mt-1 italic">Based on {displayCount} reviews</p>
           </div>
         </div>
 
-        {/* Action Cards */}
+        {/* Browse & Messages Buttons (Keep your existing UI here) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-          <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center text-center">
-            <h3 className="text-xl font-bold mb-2 text-gray-800">Browse Requests</h3>
-            <p className="text-gray-500 mb-6 font-light">
-              Look for people nearby who need help with their shopping or deliveries.
-            </p>
-            <button 
-              onClick={() => navigate('/browse')}
-              className="bg-blue-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-blue-700 transition shadow-lg"
-            >
-              Go to Browse
-            </button>
-          </div>
-
-          <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center text-center">
-            <h3 className="text-xl font-bold mb-2 text-gray-800">View Messages</h3>
-            <p className="text-gray-500 mb-6 font-light">
-              Stay in touch with your shoppers or requesters about ongoing tasks.
-            </p>
-            <button 
-              onClick={() => navigate('/messages')}
-              className="bg-purple-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-purple-700 transition shadow-lg"
-            >
-              Open Messages
-            </button>
-          </div>
-        </div>
-
-        {/* Bottom Section - Recent Tasks */}
-        <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-xl font-bold mb-6 text-gray-800">Recent Tasks</h3>
-          {activeTasks.length > 0 ? (
-            <div className="space-y-4">
-              {activeTasks.map((task) => (
-                <div 
-                  key={task.id} 
-                  onClick={() => navigate(`/request/${task.id}`)}
-                  className="flex justify-between items-center p-4 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition"
-                >
-                  <div>
-                    <p className="font-bold text-gray-800">{task.itemName}</p>
-                    <p className="text-sm text-gray-500">{task.storeName || 'Any Store'}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-blue-600 font-bold">₱{task.budget}</p>
-                    <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full uppercase">
-                      {task.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
+            <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center text-center">
+                <h3 className="text-xl font-bold mb-2 text-gray-800">Browse Requests</h3>
+                <button onClick={() => navigate('/browse')} className="bg-blue-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-blue-700 transition">Go to Browse</button>
             </div>
-          ) : (
-            <div className="text-center py-10">
-              <div className="text-4xl mb-4">🛒</div>
-              <p className="text-gray-400 italic">No active tasks yet. Head to "Browse Requests" to find one!</p>
+            <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center text-center">
+                <h3 className="text-xl font-bold mb-2 text-gray-800">View Messages</h3>
+                <button onClick={() => navigate('/messages')} className="bg-purple-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-purple-700 transition">Open Messages</button>
             </div>
-          )}
         </div>
       </main>
     </div>
