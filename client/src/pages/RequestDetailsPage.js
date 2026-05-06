@@ -24,18 +24,28 @@ const RequestDetailsPage = () => {
     error,
   } = useRequestDetails(id, user?.uid);
 
+  // Updated handleAccept to pass requesterId
   const handleAccept = async () => {
+    if (!request || !user) return;
+
     try {
-      await acceptRequest(id, user.uid);
+      await acceptRequest(id, user.uid, request.requesterId);
       // Stay on this page — onSnapshot updates UI automatically
     } catch (err) {
       console.error('Failed to accept request:', err);
     }
   };
 
+  // Updated handleComplete to pass both shopperId and requesterId
   const handleComplete = async () => {
+    if (!request) return;
+
     try {
-      await completeRequest(id);
+      await completeRequest(
+        id,
+        request.shopperId,
+        request.requesterId
+      );
     } catch (err) {
       console.error('Failed to complete request:', err);
     }
@@ -43,8 +53,8 @@ const RequestDetailsPage = () => {
 
   // ✅ Wait for auth AND request before computing roles
   if (authLoading)  return <div className="p-8">Loading...</div>;
-  if (error)        return <div className="p-8 text-red-500">{error}</div>;
-  if (!request)     return <div className="p-8">Loading...</div>;
+  if (error)         return <div className="p-8 text-red-500">{error}</div>;
+  if (!request)      return <div className="p-8">Loading...</div>;
 
   // ✅ These are now computed AFTER user is guaranteed to be loaded
   const isRequester = user?.uid === request.requesterId;
