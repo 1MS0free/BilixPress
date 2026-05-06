@@ -1,27 +1,30 @@
 import {
   doc,
-  updateDoc,
-  addDoc,
+  writeBatch,
   collection,
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
-// ✅ ACCEPT REQUEST (optimized + safe)
+// ✅ ACCEPT REQUEST (Optimized with Batches)
 export const acceptRequest = async (requestId, shopperId, requesterId) => {
   if (!requestId || !shopperId || !requesterId) {
     throw new Error('Missing required parameters.');
   }
 
-  // 1. Update request first (fast UI update via onSnapshot)
-  await updateDoc(doc(db, 'requests', requestId), {
+  const batch = writeBatch(db);
+
+  // 1. Reference for the request document
+  const requestRef = doc(db, 'requests', requestId);
+  batch.update(requestRef, {
     status: 'Accepted',
     shopperId,
-    acceptedAt: serverTimestamp(), // ✅ track when accepted
+    acceptedAt: serverTimestamp(),
   });
 
-  // 2. Send system message
-  await addDoc(collection(db, 'messages'), {
+  // 2. Reference for a new system message
+  const messageRef = doc(collection(db, 'messages'));
+  batch.set(messageRef, {
     requestId,
     senderId: shopperId,
     receiverId: requesterId,
@@ -29,23 +32,30 @@ export const acceptRequest = async (requestId, shopperId, requesterId) => {
     createdAt: serverTimestamp(),
     system: true,
   });
+
+  // 3. Commit both updates in one network trip
+  await batch.commit();
 };
 
-// ✅ COMPLETE REQUEST (with optional message)
+// ✅ COMPLETE REQUEST (Optimized with Batches)
 export const completeRequest = async (requestId, shopperId, requesterId) => {
   if (!requestId) {
     throw new Error('Missing requestId.');
   }
 
+  const batch = writeBatch(db);
+
   // 1. Mark as completed
-  await updateDoc(doc(db, 'requests', requestId), {
+  const requestRef = doc(db, 'requests', requestId);
+  batch.update(requestRef, {
     status: 'Completed',
-    completedAt: serverTimestamp(), // ✅ track completion time
+    completedAt: serverTimestamp(),
   });
 
-  // 2. OPTIONAL: notify both users
+  // 2. Notify both users via system message
   if (shopperId && requesterId) {
-    await addDoc(collection(db, 'messages'), {
+    const messageRef = doc(collection(db, 'messages'));
+    batch.set(messageRef, {
       requestId,
       senderId: shopperId,
       receiverId: requesterId,
@@ -54,4 +64,6 @@ export const completeRequest = async (requestId, shopperId, requesterId) => {
       system: true,
     });
   }
+
+  await batch.commit();
 };
