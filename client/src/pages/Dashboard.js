@@ -6,30 +6,28 @@ import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
 import Sidebar from '../components/Sidebar';
 
 const Dashboard = () => {
-  // Use the user and loading state from your useAuth hook
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
+  // State Management
   const [activeItemsList, setActiveItemsList] = useState([]); 
   const [completedCount, setCompletedCount] = useState(0);
+  const [avgRating, setAvgRating] = useState("0.00");
+  const [totalReviews, setTotalReviews] = useState(0);
 
   useEffect(() => {
     if (!user?.uid) return;
 
-    // MATCHING YOUR Sidebar.jsx LOGIC: Check both object and localStorage
+    // Consistency check for roles (lowercase to match your useAuth hook)
     const role = user?.role || localStorage.getItem('active_user_role');
-    
-    // Using lowercase 'shopper' to match your useAuth.js
     const isShopperRole = role === 'shopper';
 
+    // 1. STATS QUERIES (Active & Completed Requests)
     let qActive, qComp;
-
     if (isShopperRole) {
-      // SHOPPER: Accepted tasks and Completed tasks
       qActive = query(collection(db, 'requests'), where('shopperId', '==', user.uid), where('status', '==', 'Accepted'));
       qComp = query(collection(db, 'requests'), where('shopperId', '==', user.uid), where('status', '==', 'Completed'));
     } else {
-      // REQUESTER: Posted/Accepted tasks and Completed tasks
       qActive = query(collection(db, 'requests'), where('requesterId', '==', user.uid), where('status', 'in', ['Posted', 'Accepted']));
       qComp = query(collection(db, 'requests'), where('requesterId', '==', user.uid), where('status', '==', 'Completed'));
     }
@@ -37,19 +35,35 @@ const Dashboard = () => {
     const unsubActive = onSnapshot(qActive, (s) => setActiveItemsList(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubComp = onSnapshot(qComp, (s) => setCompletedCount(s.docs.length));
 
-    return () => { unsubActive(); unsubComp(); };
+    // 2. RATING CALCULATION (Real-time average from your 'ratings' collection)
+    const qRatings = query(collection(db, 'ratings'), where('revieweeId', '==', user.uid));
+    
+    const unsubRatings = onSnapshot(qRatings, (snapshot) => {
+      if (!snapshot.empty) {
+        const ratingsArray = snapshot.docs.map(doc => doc.data().rating);
+        const total = ratingsArray.reduce((acc, curr) => acc + curr, 0);
+        const average = (total / ratingsArray.length).toFixed(2);
+        
+        setAvgRating(average);
+        setTotalReviews(ratingsArray.length);
+      } else {
+        // Fallback to static user profile data if no individual ratings are found
+        setAvgRating(user?.rating ? Number(user.rating).toFixed(2) : "0.00");
+        setTotalReviews(user?.reviewCount || 0);
+      }
+    });
+
+    return () => { 
+      unsubActive(); 
+      unsubComp(); 
+      unsubRatings(); 
+    };
   }, [user]);
 
   if (authLoading) return null;
 
-  // CONSISTENT ROLE CHECKING
   const currentRole = user?.role || localStorage.getItem('active_user_role');
   const isShopper = currentRole === 'shopper';
-  
-  // RATING SYNC: Using the data spread into the user object by useAuth
-  // This pulls 'rating' and 'reviewCount' directly from your Firestore 'users' doc
-  const ratingValue = user?.rating ? Number(user.rating).toFixed(2) : "0.00";
-  const reviewCount = user?.reviewCount || 0;
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -78,35 +92,35 @@ const Dashboard = () => {
             <p className="text-gray-500 font-bold mt-2 uppercase text-xs">Completed</p>
           </div>
           <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center">
-            <p className="text-5xl font-black text-yellow-500">{ratingValue}</p>
+            <p className="text-5xl font-black text-yellow-500">{avgRating}</p>
             <p className="text-gray-500 font-bold mt-2 uppercase text-xs">Rating</p>
-            {reviewCount > 0 && <p className="text-[10px] text-gray-400 italic">Based on {reviewCount} reviews</p>}
+            {totalReviews > 0 && (
+              <p className="text-[10px] text-gray-400 italic">Based on {totalReviews} reviews</p>
+            )}
           </div>
         </div>
 
-        {/* THE TWO BOXES - NOW LOCKED TO LOWERCASE ROLE */}
+        {/* ACTION BUTTONS (Role-Dependent) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
           {isShopper ? (
             <>
-              {/* SHOPPER VIEW */}
-              <div onClick={() => navigate('/browse')} className="bg-white p-12 rounded-2xl shadow-sm border border-gray-100 hover:bg-blue-50 cursor-pointer text-center group">
+              <div onClick={() => navigate('/browse')} className="bg-white p-12 rounded-2xl shadow-sm border border-gray-100 hover:bg-blue-50 cursor-pointer text-center group transition-all">
                 <h3 className="text-2xl font-black mb-4">Browse Requests</h3>
                 <div className="bg-blue-600 text-white px-10 py-3 rounded-lg font-bold group-hover:bg-blue-700 inline-block">Go to Browse</div>
               </div>
-              <div onClick={() => navigate('/messages')} className="bg-white p-12 rounded-2xl shadow-sm border border-gray-100 hover:bg-purple-50 cursor-pointer text-center group">
+              <div onClick={() => navigate('/messages')} className="bg-white p-12 rounded-2xl shadow-sm border border-gray-100 hover:bg-purple-50 cursor-pointer text-center group transition-all">
                 <h3 className="text-2xl font-black mb-4">View Messages</h3>
                 <div className="bg-purple-600 text-white px-10 py-3 rounded-lg font-bold group-hover:bg-purple-700 inline-block">Open Messages</div>
               </div>
             </>
           ) : (
             <>
-              {/* REQUESTER VIEW */}
-              <div onClick={() => navigate('/post-request')} className="bg-white p-12 rounded-2xl shadow-sm border-2 border-dashed border-gray-200 hover:border-blue-400 cursor-pointer text-center">
+              <div onClick={() => navigate('/post-request')} className="bg-white p-12 rounded-2xl shadow-sm border-2 border-dashed border-gray-200 hover:border-blue-400 cursor-pointer text-center transition-all">
                 <span className="text-5xl block mb-2">➕</span>
                 <h3 className="text-xl font-bold">Post New Request</h3>
                 <p className="text-sm text-gray-400 mt-1">Need something bought for you?</p>
               </div>
-              <div onClick={() => navigate('/messages')} className="bg-white p-12 rounded-2xl shadow-sm border border-gray-100 hover:bg-gray-50 cursor-pointer text-center">
+              <div onClick={() => navigate('/messages')} className="bg-white p-12 rounded-2xl shadow-sm border border-gray-100 hover:bg-gray-50 cursor-pointer text-center transition-all">
                 <span className="text-5xl block mb-2">💬</span>
                 <h3 className="text-xl font-bold">View Messages</h3>
                 <p className="text-sm text-gray-400 mt-1">Check updates from your shoppers.</p>
@@ -115,7 +129,7 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* ACTIVE LIST */}
+        {/* ACTIVE LIST SECTION */}
         <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
           <h3 className="text-2xl font-bold mb-6 text-gray-800">
             📋 {isShopper ? 'Active Tasks' : 'Active Requests'}
@@ -123,7 +137,7 @@ const Dashboard = () => {
           {activeItemsList.length > 0 ? (
             <div className="space-y-4">
               {activeItemsList.map((item) => (
-                <div key={item.id} className="flex justify-between items-center p-5 border rounded-xl hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/request/${item.id}`)}>
+                <div key={item.id} className="flex justify-between items-center p-5 border rounded-xl hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => navigate(`/request/${item.id}`)}>
                   <div>
                     <p className="font-bold text-gray-800">{item.itemName}</p>
                     <p className="text-xs text-gray-400 uppercase tracking-tighter">{item.storeName || 'Any Store'}</p>
