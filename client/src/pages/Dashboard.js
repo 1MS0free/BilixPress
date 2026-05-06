@@ -61,8 +61,8 @@ const Dashboard = () => {
   if (!user) return <div className="p-10 text-red-500">Please log in.</div>;
 
   // --- RATING LOGIC ---
-  // If the user has a rating in Firestore, use it. Otherwise, default to 5.00 for new users.
   const displayRating = user.rating ? Number(user.rating).toFixed(2) : "5.00";
+  const displayCount = user.reviewCount || 0;
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -87,9 +87,12 @@ const Dashboard = () => {
             <p className="text-gray-500 font-medium">Completed</p>
           </div>
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 text-center">
-            {/* UPDATED RATING DISPLAY */}
             <p className="text-4xl font-bold text-yellow-500">{displayRating}</p>
             <p className="text-gray-500 font-medium">Rating</p>
+            {/* NEW: REVIEWS COUNT DISPLAY */}
+            <p className="text-xs text-gray-400 mt-1 italic">
+              Based on {displayCount} {displayCount === 1 ? 'review' : 'reviews'}
+            </p>
           </div>
         </div>
 
