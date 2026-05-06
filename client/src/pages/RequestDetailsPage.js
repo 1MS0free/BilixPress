@@ -26,7 +26,8 @@ const RequestDetailsPage = () => {
   const handleAccept = async () => {
     try {
       await acceptRequest(id, user.uid);
-      navigate(`/chat/${id}`);
+      // ✅ Stay on the same page — chat is embedded here, not on /chat/:id
+      // The onSnapshot listener will update isAccepted automatically
     } catch (err) {
       console.error('Failed to accept request:', err);
     }
@@ -40,7 +41,7 @@ const RequestDetailsPage = () => {
     }
   };
 
-  // ── Guards ──────────────────────────────────────────────────────────────────
+  // ── Guards ─────────────────────────────────────────────────────────────────
   if (error)    return <div className="p-8 text-red-500">{error}</div>;
   if (!request) return <div className="p-8">Loading...</div>;
 
@@ -191,7 +192,9 @@ const RequestDetailsPage = () => {
           ) : (
             <div className="flex flex-col items-center justify-center h-48 text-center text-gray-400 text-sm italic">
               <span className="text-3xl mb-2">💬</span>
-              Chat will be available once a shopper accepts your request.
+              {isRequester
+                ? 'Chat will be available once a shopper accepts your request.'
+                : 'Chat will be available once you accept this request.'}
             </div>
           )}
         </div>
