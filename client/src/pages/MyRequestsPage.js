@@ -24,7 +24,6 @@ const MyRequestsPage = () => {
       const reqs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setRequests(reqs);
 
-      // Check which completed requests have already been rated
       const rated = {};
       await Promise.all(
         reqs.map(async (req) => {
@@ -53,7 +52,6 @@ const MyRequestsPage = () => {
                 key={req.id}
                 className="bg-white rounded shadow p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
               >
-                {/* Request info */}
                 <div className="flex-1">
                   <div className="font-semibold text-lg">{req.itemName}</div>
                   <div className="text-gray-500 text-sm">Store: {req.storeName || 'N/A'}</div>
@@ -64,7 +62,6 @@ const MyRequestsPage = () => {
                     {req.status}
                   </span>
 
-                  {/* Status message under badge */}
                   {req.status === 'Posted' && (
                     <p className="text-xs text-gray-400 italic mt-1">
                       ⏳ Waiting for a shopper to accept...
@@ -82,31 +79,30 @@ const MyRequestsPage = () => {
                   )}
                 </div>
 
-                {/* Action buttons */}
                 <div className="flex flex-col gap-2 min-w-[160px]">
 
-                  {/* View Details — always visible */}
+                  {/* Always visible */}
                   <Link
-                    to={`/requests/${req.id}`}
+                    to={`/request/${req.id}`}
                     className="text-center bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 text-sm font-medium"
                   >
                     View Details
                   </Link>
 
-                  {/* Chat — only when Accepted or Completed */}
+                  {/* Chat — Accepted or Completed only */}
                   {(req.status === 'Accepted' || req.status === 'Completed') && req.shopperId && (
                     <Link
-                      to={`/requests/${req.id}`}
+                      to={`/request/${req.id}`}
                       className="text-center bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm font-medium"
                     >
                       💬 Chat with Shopper
                     </Link>
                   )}
 
-                  {/* Rate — only when Completed and not yet rated */}
+                  {/* Rate — Completed and not yet rated */}
                   {req.status === 'Completed' && req.shopperId && !ratedMap[req.id] && (
                     <Link
-                      to={`/requests/${req.id}#rate`}
+                      to={`/request/${req.id}#rate`}
                       className="text-center bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 text-sm font-medium"
                     >
                       ⭐ Rate Shopper
