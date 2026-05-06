@@ -18,12 +18,12 @@ function getNavItems(user) {
     ];
   } else {
     return [
-      { label: 'Dashboard',    path: '/dashboard',   icon: 'dashboard' },
-      { label: 'Post Request', path: '/post-request', icon: 'post'     },
-      { label: 'My Requests',  path: '/my-requests',  icon: 'requests' },
-      { label: 'Messages',     path: '/messages',     icon: 'messages' },
-      { label: 'History',      path: '/history',      icon: 'history'  },
-      { label: 'Settings',     path: '/settings',     icon: 'settings' },
+      { label: 'Dashboard',    path: '/dashboard',    icon: 'dashboard' },
+      { label: 'Post Request', path: '/post-request',  icon: 'post'      },
+      { label: 'My Requests',  path: '/my-requests',   icon: 'requests'  },
+      { label: 'Messages',     path: '/messages',      icon: 'messages'  },
+      { label: 'History',      path: '/history',       icon: 'history'   },
+      { label: 'Settings',     path: '/settings',      icon: 'settings'  },
     ];
   }
 }
@@ -49,7 +49,6 @@ const Sidebar = ({ user }) => {
         where('status', '==', 'Accepted')
       );
       const unsub = onSnapshot(q, (snap) => {
-        // Show dot whenever there is at least one accepted request
         setHasNewAccepted(!snap.empty);
       });
       return () => unsub();
@@ -92,22 +91,28 @@ const Sidebar = ({ user }) => {
   return (
     <aside className="w-64 min-h-screen bg-white border-r flex flex-col">
 
-      {/* Brand */}
+      {/* Brand Section */}
       <div className="flex items-center px-6 py-6 border-b">
         <img src={logo} alt="Bilixpress Logo" className="w-10 h-10 rounded-xl mr-3" />
         <div>
-          <div className="font-semibold text-gray-900">Bilixpress</div>
-          <div className="text-xs text-gray-500">{user?.name || 'Requester'}</div>
+          {/* Displays the User's name from Firebase or a default */}
+          <div className="font-semibold text-gray-900 truncate w-32">
+            {user?.displayName || user?.name || 'User'}
+          </div>
+          {/* Dynamic Role Label: Shopper, Admin, or Requester */}
+          <div className="text-xs text-gray-500 capitalize">
+            {user?.role === 'shopper' ? 'Shopper' : user?.isAdmin ? 'Admin' : 'Requester'}
+          </div>
         </div>
       </div>
 
-      {/* Nav */}
+      {/* Nav Section */}
       <nav className="flex-1 px-4 py-6 space-y-2">
         {getNavItems(user).map(item => (
           <Link
             key={item.path}
             to={item.path}
-            className={`relative flex items-center gap-3 px-4 py-2 rounded hover:bg-blue-50 font-medium
+            className={`relative flex items-center gap-3 px-4 py-2 rounded hover:bg-blue-50 font-medium transition-colors
               ${location.pathname === item.path
                 ? 'bg-blue-100 text-blue-700'
                 : 'text-gray-700'}`}
@@ -125,7 +130,7 @@ const Sidebar = ({ user }) => {
         {user?.isAdmin && (
           <Link
             to={adminNavItem.path}
-            className={`flex items-center gap-3 px-4 py-2 rounded hover:bg-blue-50 font-medium
+            className={`flex items-center gap-3 px-4 py-2 rounded hover:bg-blue-50 font-medium transition-colors
               ${location.pathname === adminNavItem.path
                 ? 'bg-blue-100 text-blue-700'
                 : 'text-gray-700'}`}
@@ -136,7 +141,7 @@ const Sidebar = ({ user }) => {
         )}
       </nav>
 
-      {/* Logout */}
+      {/* Logout Section */}
       <div className="px-6 py-4 border-t">
         <button
           onClick={handleLogout}
