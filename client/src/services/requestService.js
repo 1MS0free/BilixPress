@@ -2,42 +2,32 @@ import {
   doc,
   updateDoc,
   addDoc,
-  getDoc,
   collection,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
-export const acceptRequest = async (requestId, shopperId) => {
-  const shopperSnap = await getDoc(doc(db, 'users', shopperId));
-  let shopperInfo = { name: '', phone: '', idNumber: '' };
-  if (shopperSnap.exists()) {
-    const d = shopperSnap.data();
-    shopperInfo = {
-      name: d.name || '',
-      phone: d.phone || '',
-      idNumber: d.idNumber || '',
-    };
-  }
-
-  const requestSnap = await getDoc(doc(db, 'requests', requestId));
-  if (!requestSnap.exists()) throw new Error('Request not found.');
-  const requesterId = requestSnap.data().requesterId;
-
+// ✅ OPTIMIZED
+export const acceptRequest = async (requestId, shopperId, requesterId) => {
+  // Fast update
   await updateDoc(doc(db, 'requests', requestId), {
     status: 'Accepted',
     shopperId,
   });
 
+  // Simple system message (no extra reads)
   await addDoc(collection(db, 'messages'), {
     requestId,
     senderId: shopperId,
     receiverId: requesterId,
-    text: `Hello! I have accepted your request.\nShopper: ${shopperInfo.name}\nContact: ${shopperInfo.phone}\nID Number: ${shopperInfo.idNumber}`,
-    createdAt: new Date(),
+    text: 'Hello! I have accepted your request.',
+    createdAt: serverTimestamp(),
     system: true,
   });
 };
 
 export const completeRequest = async (requestId) => {
-  await updateDoc(doc(db, 'requests', requestId), { status: 'Completed' });
+  await updateDoc(doc(db, 'requests', requestId), {
+    status: 'Completed',
+  });
 };
