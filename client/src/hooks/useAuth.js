@@ -11,30 +11,38 @@ export function useAuth() {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
         if (firebaseUser) {
-          // The "Nuclear Fix": wrap the Firestore request in a try/catch.
-          // If uBlock or Opera GX blocks this, the code jumps straight to 'catch'
-          // instead of hanging here forever.
+          // 1. Try to get data from Firestore
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           
-          setUser({ 
+          let userData = { 
             uid: firebaseUser.uid, 
             email: firebaseUser.email, 
             ...(userDoc.exists() ? userDoc.data() : {}) 
-          });
+          };
+
+          // 2. Cache the data in localStorage for "offline/blocked" situations
+          if (userDoc.exists()) {
+            localStorage.setItem(`user_cache_${firebaseUser.uid}`, JSON.stringify(userData));
+          }
+
+          setUser(userData);
         } else {
           setUser(null);
         }
       } catch (err) {
-        // This handles the ERR_BLOCKED_BY_CLIENT gracefully
-        console.warn("Firestore access blocked by browser/extension. Proceeding with basic auth data.", err);
+        console.warn("Firestore access blocked. Attempting to use cached profile.", err);
         
-        // Safety net: Set basic user info so the app still knows who is logged in
         if (firebaseUser) {
-          setUser({ uid: firebaseUser.uid, email: firebaseUser.email });
+          // 3. FALLBACK: Try to recover role from localStorage cache
+          const cachedData = localStorage.getItem(`user_cache_${firebaseUser.uid}`);
+          if (cachedData) {
+            setUser(JSON.parse(cachedData));
+          } else {
+            // Last resort: basic info only
+            setUser({ uid: firebaseUser.uid, email: firebaseUser.email });
+          }
         }
       } finally {
-        // CRITICAL: This line is the "Nuclear" part. 
-        // It ensures that no matter what happens above, the loading screen IS REMOVED.
         setLoading(false);
       }
     });
