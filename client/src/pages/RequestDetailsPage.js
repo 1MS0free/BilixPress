@@ -1,5 +1,5 @@
 import React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useRequestDetails } from '../hooks/useRequestDetails';
 import { acceptRequest, completeRequest } from '../services/requestService';
@@ -10,8 +10,9 @@ import RequestChat from '../components/RequestChat';
 
 const RequestDetailsPage = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
-  const { user } = useAuth();
+
+  // ✅ Pull loading from useAuth so we don't render until user is known
+  const { user, loading: authLoading } = useAuth();
 
   const {
     request,
@@ -26,8 +27,7 @@ const RequestDetailsPage = () => {
   const handleAccept = async () => {
     try {
       await acceptRequest(id, user.uid);
-      // ✅ Stay on the same page — chat is embedded here, not on /chat/:id
-      // The onSnapshot listener will update isAccepted automatically
+      // Stay on this page — onSnapshot updates UI automatically
     } catch (err) {
       console.error('Failed to accept request:', err);
     }
@@ -41,15 +41,20 @@ const RequestDetailsPage = () => {
     }
   };
 
-  // ── Guards ─────────────────────────────────────────────────────────────────
-  if (error)    return <div className="p-8 text-red-500">{error}</div>;
-  if (!request) return <div className="p-8">Loading...</div>;
+  // ✅ Wait for auth AND request before computing roles
+  if (authLoading)  return <div className="p-8">Loading...</div>;
+  if (error)        return <div className="p-8 text-red-500">{error}</div>;
+  if (!request)     return <div className="p-8">Loading...</div>;
 
+  // ✅ These are now computed AFTER user is guaranteed to be loaded
   const isRequester = user?.uid === request.requesterId;
   const isShopper   = user?.uid === request.shopperId;
   const isPosted    = request.status === 'Posted';
   const isAccepted  = request.status === 'Accepted';
   const isCompleted = request.status === 'Completed';
+
+  // The other person in the conversation
+  const chatReceiverId = isRequester ? request.shopperId : request.requesterId;
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -115,7 +120,7 @@ const RequestDetailsPage = () => {
                 )}
                 {isAccepted && (
                   <p className="mt-4 text-sm text-blue-600 font-medium">
-                    ✓ A shopper has accepted your request. Chat is now open.
+                    ✓ A shopper has accepted your request. You can now chat with them →
                   </p>
                 )}
                 {isCompleted && (
@@ -148,7 +153,7 @@ const RequestDetailsPage = () => {
               </>
             )}
 
-            {/* ── Rating Section (both sides, Completed only) ──────────────── */}
+            {/* ── Rating (both sides, Completed only) ─────────────────────── */}
             {isCompleted && showRating && (
               <div className="mt-8" id="rate">
                 {hasRated ? (
@@ -183,18 +188,25 @@ const RequestDetailsPage = () => {
           </div>
         </div>
 
-        {/* ── Right: Chat Sidebar ──────────────────────────────────────────── */}
+        {/* ── Right: Chat ──────────────────────────────────────────────────── */}
         <div className="w-full max-w-sm bg-white rounded shadow p-6 flex flex-col h-fit self-start">
-          <h3 className="text-lg font-bold mb-4">Messages</h3>
+          <h3 className="text-lg font-bold mb-4">
+            {isAccepted || isCompleted ? '💬 Messages' : 'Messages'}
+          </h3>
 
           {isAccepted || isCompleted ? (
-            <RequestChat requestId={id} user={user} disabled={isCompleted} />
+            <RequestChat
+              requestId={id}
+              user={user}
+              receiverId={chatReceiverId}
+              disabled={isCompleted}
+            />
           ) : (
             <div className="flex flex-col items-center justify-center h-48 text-center text-gray-400 text-sm italic">
               <span className="text-3xl mb-2">💬</span>
               {isRequester
-                ? 'Chat will be available once a shopper accepts your request.'
-                : 'Chat will be available once you accept this request.'}
+                ? 'Chat opens once a shopper accepts your request.'
+                : 'Chat opens once you accept this request.'}
             </div>
           )}
         </div>
