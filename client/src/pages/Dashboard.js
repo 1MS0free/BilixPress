@@ -60,17 +60,23 @@ const Dashboard = () => {
   if (authLoading) return <div className="p-10">Loading...</div>;
   if (!user) return <div className="p-10 text-red-500">Please log in.</div>;
 
+  // --- RATING LOGIC ---
+  // If the user has a rating in Firestore, use it. Otherwise, default to 5.00 for new users.
+  const displayRating = user.rating ? Number(user.rating).toFixed(2) : "5.00";
+
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar user={user} />
 
       <main className="flex-1 p-10">
         <header className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800">Welcome back, {user.displayName || 'User'}!</h1>
+          <h1 className="text-3xl font-bold text-gray-800">
+            Welcome back, {user.name || user.displayName || 'User'}!
+          </h1>
           <p className="text-gray-500 italic">Ready to help someone today?</p>
         </header>
 
-        {/* Stats Row - Updated to include Shopper Tasks */}
+        {/* Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 text-center">
             <p className="text-4xl font-bold text-blue-600">{activeRequests.length + activeTasks.length}</p>
@@ -81,12 +87,13 @@ const Dashboard = () => {
             <p className="text-gray-500 font-medium">Completed</p>
           </div>
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 text-center">
-            <p className="text-4xl font-bold text-yellow-500">5.0</p>
+            {/* UPDATED RATING DISPLAY */}
+            <p className="text-4xl font-bold text-yellow-500">{displayRating}</p>
             <p className="text-gray-500 font-medium">Rating</p>
           </div>
         </div>
 
-        {/* Action Cards - Swapped to "Browse Requests" for Shoppers */}
+        {/* Action Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
           <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center text-center">
             <h3 className="text-xl font-bold mb-2 text-gray-800">Browse Requests</h3>
@@ -115,7 +122,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Bottom Section - "Recent Tasks" for Shoppers */}
+        {/* Bottom Section - Recent Tasks */}
         <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-xl font-bold mb-6 text-gray-800">Recent Tasks</h3>
           {activeTasks.length > 0 ? (
