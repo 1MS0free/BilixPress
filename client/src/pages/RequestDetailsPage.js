@@ -104,29 +104,50 @@ const RequestDetailsPage = () => {
               )}
             </div>
 
-            {/* ── Action Buttons ───────────────────────────────────────────── */}
-
-            {/* Shopper: Accept */}
-            {isPosted && !isRequester && (
-              <button
-                onClick={handleAccept}
-                className="mt-2 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-              >
-                Accept Request
-              </button>
+            {/* ── Requester POV ───────────────────────────────────────────── */}
+            {isRequester && (
+              <>
+                {isPosted && (
+                  <p className="mt-4 text-sm text-gray-400 italic">
+                    ⏳ Waiting for a shopper to accept your request...
+                  </p>
+                )}
+                {isAccepted && (
+                  <p className="mt-4 text-sm text-blue-600 font-medium">
+                    ✓ A shopper has accepted your request. Chat is now open.
+                  </p>
+                )}
+                {isCompleted && (
+                  <p className="mt-4 text-sm text-green-600 font-medium">
+                    ✓ This request has been completed.
+                  </p>
+                )}
+              </>
             )}
 
-            {/* Shopper: Mark as Done */}
-            {isAccepted && isShopper && (
-              <button
-                onClick={handleComplete}
-                className="mt-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-              >
-                Mark as Done
-              </button>
+            {/* ── Shopper POV ─────────────────────────────────────────────── */}
+            {!isRequester && (
+              <>
+                {isPosted && (
+                  <button
+                    onClick={handleAccept}
+                    className="mt-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                  >
+                    Accept Request
+                  </button>
+                )}
+                {isAccepted && isShopper && (
+                  <button
+                    onClick={handleComplete}
+                    className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                  >
+                    Mark as Done
+                  </button>
+                )}
+              </>
             )}
 
-            {/* ── Rating Section ───────────────────────────────────────────── */}
+            {/* ── Rating Section (both sides, Completed only) ──────────────── */}
             {isCompleted && showRating && (
               <div className="mt-8" id="rate">
                 {hasRated ? (
@@ -157,6 +178,7 @@ const RequestDetailsPage = () => {
                 )}
               </div>
             )}
+
           </div>
         </div>
 
@@ -164,13 +186,13 @@ const RequestDetailsPage = () => {
         <div className="w-full max-w-sm bg-white rounded shadow p-6 flex flex-col h-fit self-start">
           <h3 className="text-lg font-bold mb-4">Messages</h3>
 
-          {/* Chat is ONLY shown when status is Accepted or Completed */}
           {isAccepted || isCompleted ? (
-            <RequestChat requestId={id} user={user} />
+            <RequestChat requestId={id} user={user} disabled={isCompleted} />
           ) : (
-            <p className="text-sm text-gray-400 italic">
-              Chat will be available once the request is accepted.
-            </p>
+            <div className="flex flex-col items-center justify-center h-48 text-center text-gray-400 text-sm italic">
+              <span className="text-3xl mb-2">💬</span>
+              Chat will be available once a shopper accepts your request.
+            </div>
           )}
         </div>
 
