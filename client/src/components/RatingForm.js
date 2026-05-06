@@ -47,21 +47,22 @@ const RatingForm = ({ requestId, revieweeId, reviewerId, onRated }) => {
         createdAt: serverTimestamp(),
       });
 
-      // 2. Fetch all reviews for this specific user (revieweeId)
+      // 2. Fetch ALL reviews for this specific user to sync old and new data
       const q = query(
         collection(db, 'reviews'), 
         where('revieweeId', '==', revieweeId)
       );
       const snapshot = await getDocs(q);
       
-      // 3. Calculate the new average
-      const ratings = snapshot.docs.map(d => d.data().rating);
-      const totalCount = ratings.length;
-      const sum = ratings.reduce((acc, curr) => acc + curr, 0);
+      // 3. Calculate the new average across ALL existing documents
+      const allReviews = snapshot.docs.map(d => d.data());
+      const totalCount = allReviews.length;
+      
+      // We use Number() here just in case old data was saved as a string
+      const sum = allReviews.reduce((acc, item) => acc + Number(item.rating || 0), 0);
       const newAverage = sum / totalCount;
 
       // 4. Update the reviewee's document in the 'users' collection
-      // This is what makes the Dashboard/Sidebar update!
       const userRef = doc(db, 'users', revieweeId);
       await updateDoc(userRef, {
         rating: newAverage,
