@@ -1,130 +1,214 @@
-import React, { useState } from 'react';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { useNavigate } from 'react-router-dom';
-import { db } from '../firebase/config';
+import React from 'react';
+import { useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useRequestDetails } from '../hooks/useRequestDetails';
+import { acceptRequest, completeRequest } from '../services/requestService';
 import Sidebar from '../components/Sidebar';
+import BackButton from '../components/BackButton';
+import RatingForm from '../components/RatingForm';
+import RequestChat from '../components/RequestChat';
 
-const PostRequestPage = () => {
+const RequestDetailsPage = () => {
+  const { id } = useParams();
   const { user } = useAuth();
-  const [form, setForm] = useState({ itemName: '', description: '', storeName: '', budget: '', convenienceFee: '' });
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
 
-  const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
+  const {
+    request,
+    shopperRating,
+    requesterRating,
+    showRating,
+    hasRated,
+    setHasRated,
+    error,
+  } = useRequestDetails(id, user?.uid);
 
-  const handleSubmit = async e => {
-    e.preventDefault();
-    setError('');
-    if (!form.itemName || !form.budget || !form.convenienceFee) {
-      setError('Please fill in all required fields.');
-      return;
-    }
+  const handleAccept = async () => {
     try {
-      await addDoc(collection(db, 'requests'), {
-        ...form,
-        budget: Number(form.budget),
-        convenienceFee: Number(form.convenienceFee),
-        status: 'Posted',
-        requesterId: user.uid,
-        shopperId: '',
-        photoUrl: '',
-        createdAt: serverTimestamp(),
-      });
-      navigate('/dashboard');
+      await acceptRequest(id, user.uid);
+      // No navigate() — stay here, onSnapshot updates UI automatically
     } catch (err) {
-      setError('Failed to post request.');
+      console.error('Failed to accept request:', err);
     }
   };
+
+  const handleComplete = async () => {
+    try {
+      await completeRequest(id);
+    } catch (err) {
+      console.error('Failed to complete request:', err);
+    }
+  };
+
+  if (error)    return <div className="p-8 text-red-500">{error}</div>;
+  if (!request) return <div className="p-8">Loading...</div>;
+
+  const isRequester = user?.uid === request.requesterId;
+  const isShopper   = user?.uid === request.shopperId;
+  const isPosted    = request.status === 'Posted';
+  const isAccepted  = request.status === 'Accepted';
+  const isCompleted = request.status === 'Completed';
+
+  // The other person in the chat
+  const chatReceiverId = isRequester ? request.shopperId : request.requesterId;
 
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar user={user} />
-      <main className="flex-1 flex items-center justify-center p-10">
-        <form onSubmit={handleSubmit} className="bg-white p-8 rounded shadow-md w-full max-w-lg">
-          <h2 className="text-2xl font-bold mb-6">Post an Errand Request</h2>
-          {error && <div className="mb-4 text-red-500">{error}</div>}
-          <div className="relative mb-4">
-            <input
-              name="itemName"
-              value={form.itemName}
-              onChange={handleChange}
-              required
-              className="w-full p-2 border rounded peer focus:outline-none focus:border-blue-500"
-              placeholder=" "
-              autoComplete="off"
-            />
-            <label className={`absolute left-3 bg-white px-1 transition-all duration-200 pointer-events-none 
-               ${form.itemName ? '-top-2.5 text-xs text-blue-600' : 'top-2 text-base text-gray-500 peer-focus:-top-2.5 peer-focus:text-xs peer-focus:text-blue-600'}`}>
-               Item Name
-            </label>
+
+      <main className="flex-1 p-10 flex gap-8">
+
+        {/* ── Left: Request Details ─────────────────────────────────────── */}
+        <div className="flex-1 max-w-2xl">
+          <BackButton />
+
+          <div className="bg-white rounded shadow p-6 mb-6">
+
+            {/* Header */}
+            <div className="flex items-center mb-4">
+              <span className="inline-block bg-blue-100 text-blue-600 rounded-full p-2 mr-2">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                  <rect width="24" height="24" rx="6" fill="#2563eb" />
+                </svg>
+              </span>
+              <h2 className="text-2xl font-bold">{request.itemName}</h2>
+            </div>
+
+            {/* Info fields */}
+            <div className="space-y-1 text-sm text-gray-700 mb-4">
+              <p>Description: {request.description || 'N/A'}</p>
+              <p>Store: {request.storeName || 'N/A'}</p>
+              <p>Budget: ₱{request.budget}</p>
+              <p>Convenience Fee: ₱{request.convenienceFee}</p>
+              <p>
+                Status:{' '}
+                <span className="font-semibold">{request.status}</span>
+              </p>
+            </div>
+
+            {/* Ratings row */}
+            <div className="flex gap-6 mb-4 text-sm text-yellow-600">
+              {request.shopperId && (
+                <span>
+                  Shopper Rating:{' '}
+                  <strong>
+                    {shopperRating !== null ? `★ ${shopperRating.toFixed(2)}` : 'N/A'}
+                  </strong>
+                </span>
+              )}
+              {request.requesterId && (
+                <span>
+                  Requester Rating:{' '}
+                  <strong>
+                    {requesterRating !== null ? `★ ${requesterRating.toFixed(2)}` : 'N/A'}
+                  </strong>
+                </span>
+              )}
+            </div>
+
+            {/* ── Requester POV ───────────────────────────────────────────── */}
+            {isRequester && (
+              <>
+                {isPosted && (
+                  <p className="mt-4 text-sm text-gray-400 italic">
+                    ⏳ Waiting for a shopper to accept your request...
+                  </p>
+                )}
+                {isAccepted && (
+                  <p className="mt-4 text-sm text-blue-600 font-medium">
+                    ✓ A shopper has accepted your request. You can now chat with them →
+                  </p>
+                )}
+                {isCompleted && (
+                  <p className="mt-4 text-sm text-green-600 font-medium">
+                    ✓ This request has been completed.
+                  </p>
+                )}
+              </>
+            )}
+
+            {/* ── Shopper POV ─────────────────────────────────────────────── */}
+            {!isRequester && (
+              <>
+                {isPosted && (
+                  <button
+                    onClick={handleAccept}
+                    className="mt-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                  >
+                    Accept Request
+                  </button>
+                )}
+                {isAccepted && isShopper && (
+                  <button
+                    onClick={handleComplete}
+                    className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                  >
+                    Mark as Done
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* ── Rating (both sides, Completed only) ─────────────────────── */}
+            {isCompleted && showRating && (
+              <div className="mt-8" id="rate">
+                {hasRated ? (
+                  <p className="text-green-600 font-semibold">
+                    ✓ You have already rated this transaction.
+                  </p>
+                ) : (
+                  <>
+                    <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                      <span className="bg-yellow-100 text-yellow-600 rounded-full p-1">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <path
+                            d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2
+                               9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+                            fill="#facc15"
+                          />
+                        </svg>
+                      </span>
+                      {isRequester ? 'Rate the Shopper' : 'Rate the Requester'}
+                    </h3>
+                    <RatingForm
+                      requestId={request.id}
+                      reviewerId={user.uid}
+                      revieweeId={isRequester ? request.shopperId : request.requesterId}
+                      onRated={() => setHasRated(true)}
+                    />
+                  </>
+                )}
+              </div>
+            )}
+
           </div>
-          <div className="relative mb-4">
-            <textarea
-              name="description"
-              value={form.description}
-              onChange={handleChange}
-              className="w-full p-2 border rounded peer focus:outline-none focus:border-blue-500"
-              placeholder=" "
-              rows={3}
-              autoComplete="off"
+        </div>
+
+        {/* ── Right: Chat ──────────────────────────────────────────────────── */}
+        <div className="w-full max-w-sm bg-white rounded shadow p-6 flex flex-col h-fit self-start">
+          <h3 className="text-lg font-bold mb-4">
+            {isAccepted || isCompleted ? '💬 Messages' : 'Messages'}
+          </h3>
+
+          {isAccepted || isCompleted ? (
+            <RequestChat
+              requestId={id}
+              user={user}
+              receiverId={chatReceiverId}
+              disabled={isCompleted}
             />
-           <label className={`absolute left-3 bg-white px-1 transition-all duration-200 pointer-events-none 
-               ${form.description ? '-top-2.5 text-xs text-blue-600' : 'top-2 text-base text-gray-500 peer-focus:-top-2.5 peer-focus:text-xs peer-focus:text-blue-600'}`}>
-               Description
-            </label>
-          </div>
-          <div className="relative mb-4">
-            <input
-              name="storeName"
-              value={form.storeName}
-              onChange={handleChange}
-              className="w-full p-2 border rounded peer focus:outline-none focus:border-blue-500"
-              placeholder=" "
-              autoComplete="off"
-            />
-           <label className={`absolute left-3 bg-white px-1 transition-all duration-200 pointer-events-none 
-              ${form.storeName ? '-top-2.5 text-xs text-blue-600' : 'top-2 text-base text-gray-500 peer-focus:-top-2.5 peer-focus:text-xs peer-focus:text-blue-600'}`}>
-               Store Name
-            </label>
-          </div>
-          <div className="relative mb-4">
-            <input
-              name="budget"
-              type="number"
-              value={form.budget}
-              onChange={handleChange}
-              required
-              className="w-full p-2 border rounded peer focus:outline-none focus:border-blue-500"
-              placeholder=" "
-              autoComplete="off"
-            />
-           <label className={`absolute left-3 bg-white px-1 transition-all duration-200 pointer-events-none 
-               ${form.budget ? '-top-2.5 text-xs text-blue-600' : 'top-2 text-base text-gray-500 peer-focus:-top-2.5 peer-focus:text-xs peer-focus:text-blue-600'}`}>
-               Budget (₱)
-            </label>
-          </div>
-          <div className="relative mb-6">
-            <input
-              name="convenienceFee"
-              type="number"
-              value={form.convenienceFee}
-              onChange={handleChange}
-              required
-              className="w-full p-2 border rounded peer focus:outline-none focus:border-blue-500"
-              placeholder=" "
-              autoComplete="off"
-            />
-            <label className={`absolute left-3 bg-white px-1 transition-all duration-200 pointer-events-none 
-              ${form.convenienceFee ? '-top-2.5 text-xs text-blue-600' : 'top-2 text-base text-gray-500 peer-focus:-top-2.5 peer-focus:text-xs peer-focus:text-blue-600'}`}>
-              Convenience Fee (₱)
-            </label>
-          </div>
-          <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Post Request</button>
-        </form>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-48 text-center text-gray-400 text-sm italic">
+              <span className="text-3xl mb-2">💬</span>
+              {isRequester
+                ? 'Chat opens once a shopper accepts your request.'
+                : 'Chat opens once you accept this request.'}
+            </div>
+          )}
+        </div>
+
       </main>
     </div>
   );
 };
 
-export default PostRequestPage;
+export default RequestDetailsPage;
