@@ -13,19 +13,14 @@ const MessagesPage = () => {
   useEffect(() => {
     if (!user) return;
 
-    // Track all request IDs we've already added to avoid duplicates
-    const seenIds = new Set();
-
     const handleSnapshot = (snap) => {
       const reqs = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(r =>
-          // Only show Accepted or Completed requests that have a shopper
           (r.status === 'Accepted' || r.status === 'Completed') && r.shopperId
         );
 
       setConversations(prev => {
-        // Merge new results with existing, deduplicating by id
         const existingMap = Object.fromEntries(prev.map(r => [r.id, r]));
         reqs.forEach(r => { existingMap[r.id] = r; });
         return Object.values(existingMap);
@@ -47,9 +42,10 @@ const MessagesPage = () => {
   }, [user]);
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    // Outer layout: fixed height, no page scroll
+    <div className="flex h-screen overflow-hidden bg-gray-50">
       <Sidebar user={user} />
-      <main className="flex-1 p-10">
+      <main className="flex-1 overflow-y-auto p-10">
         <h2 className="text-2xl font-bold mb-6">Messages</h2>
 
         {loading ? (
@@ -60,38 +56,40 @@ const MessagesPage = () => {
             Messages will appear here when a request is accepted.
           </div>
         ) : (
-          <ul className="space-y-3">
-            {conversations.map(req => {
-              const otherName = user.uid === req.requesterId
-                ? (req.shopperName || 'Shopper')
-                : (req.requesterName || 'Requester');
+          // Scrollable container — only this box scrolls
+          <div className="bg-white rounded-xl shadow overflow-y-auto max-h-[70vh]">
+            <ul className="divide-y divide-gray-100">
+              {conversations.map(req => {
+                const otherName = user.uid === req.requesterId
+                  ? (req.shopperName || 'Shopper')
+                  : (req.requesterName || 'Requester');
 
-              return (
-                <li key={req.id}>
-                  {/* ✅ Links to /request/:id where chat is embedded */}
-                  <Link
-                    to={`/request/${req.id}`}
-                    className="flex items-center gap-4 bg-white rounded shadow px-5 py-4 hover:bg-blue-50 transition"
-                  >
-                    <div className="bg-blue-100 text-blue-600 rounded-full w-10 h-10 flex items-center justify-center font-bold text-lg">
-                      {otherName[0]?.toUpperCase() || '?'}
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-semibold">{otherName}</div>
-                      <div className="text-sm text-gray-500">{req.itemName}</div>
-                    </div>
-                    <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                      req.status === 'Completed'
-                        ? 'bg-blue-50 text-blue-600'
-                        : 'bg-green-50 text-green-600'
-                    }`}>
-                      {req.status}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+                return (
+                  <li key={req.id}>
+                    <Link
+                      to={`/request/${req.id}`}
+                      className="flex items-center gap-4 px-5 py-4 hover:bg-blue-50 transition"
+                    >
+                      <div className="bg-blue-100 text-blue-600 rounded-full w-10 h-10 flex items-center justify-center font-bold text-lg flex-shrink-0">
+                        {otherName[0]?.toUpperCase() || '?'}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-semibold">{otherName}</div>
+                        <div className="text-sm text-gray-500">{req.itemName}</div>
+                      </div>
+                      <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                        req.status === 'Completed'
+                          ? 'bg-blue-50 text-blue-600'
+                          : 'bg-green-50 text-green-600'
+                      }`}>
+                        {req.status}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         )}
       </main>
     </div>

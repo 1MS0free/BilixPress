@@ -34,9 +34,11 @@ const ActiveTasksPage = () => {
   if (!user) return <div className="p-8">Please log in to view your active tasks.</div>;
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    // CHANGED: min-h-screen → h-screen overflow-hidden
+    <div className="flex h-screen overflow-hidden bg-gray-50">
       <Sidebar user={user} />
-      <main className="flex-1 p-10">
+      {/* CHANGED: added overflow-y-auto */}
+      <main className="flex-1 overflow-y-auto p-10">
         <h1 className="text-2xl font-bold mb-6">Active Tasks</h1>
 
         {tasks.length === 0 ? (

@@ -19,11 +19,12 @@ const BrowseRequestsPage = () => {
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    // CHANGED: min-h-screen → h-screen overflow-hidden
+    <div className="flex h-screen overflow-hidden bg-gray-50">
       {/* ✅ user prop restored — Sidebar needs it to show correct nav items */}
       <Sidebar user={user} />
-
-      <main className="flex-1 p-8">
+      {/* CHANGED: added overflow-y-auto */}
+      <main className="flex-1 overflow-y-auto p-8">
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Browse Requests</h2>
           <p className="text-sm text-gray-500 mt-1">Pick an errand and start earning</p>

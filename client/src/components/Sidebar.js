@@ -74,7 +74,8 @@ const Sidebar = ({ user }) => {
   const navItems = getNavItems(user);
 
   return (
-    <aside className="w-60 min-h-screen bg-white border-r border-gray-100 flex flex-col shadow-sm">
+    // CHANGED: min-h-screen → h-screen sticky top-0, added overflow-y-auto
+    <aside className="w-60 h-screen sticky top-0 bg-white border-r border-gray-100 flex flex-col shadow-sm overflow-y-auto">
 
       {/* Brand */}
       <div className="flex items-center gap-3 px-5 py-5 border-b border-gray-100">
