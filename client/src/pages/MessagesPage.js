@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { useAuth } from '../hooks/useAuth';
 import Sidebar from '../components/Sidebar';
@@ -8,8 +8,10 @@ import { Link } from 'react-router-dom';
 const MessagesPage = () => {
   const { user } = useAuth();
   const [conversations, setConversations] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [lastMsgMap, setLastMsgMap]       = useState({}); // requestId → last message
+  const [loading, setLoading]             = useState(true);
 
+  // ── Load conversations (requests) ─────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
 
@@ -41,8 +43,29 @@ const MessagesPage = () => {
     return () => { unsub1(); unsub2(); };
   }, [user]);
 
+  // ── For each conversation, listen to its latest message ───────────────────
+  useEffect(() => {
+    if (conversations.length === 0) return;
+
+    const unsubs = conversations.map(req => {
+      const q = query(
+        collection(db, 'messages'),
+        where('requestId', '==', req.id),
+        orderBy('createdAt', 'desc'),
+        limit(1)
+      );
+      return onSnapshot(q, (snap) => {
+        if (!snap.empty) {
+          const msg = { id: snap.docs[0].id, ...snap.docs[0].data() };
+          setLastMsgMap(prev => ({ ...prev, [req.id]: msg }));
+        }
+      });
+    });
+
+    return () => unsubs.forEach(u => u());
+  }, [conversations]);
+
   return (
-    // Outer layout: fixed height, no page scroll
     <div className="flex h-screen overflow-hidden bg-gray-50">
       <Sidebar user={user} />
       <main className="flex-1 overflow-y-auto p-10">
@@ -56,13 +79,25 @@ const MessagesPage = () => {
             Messages will appear here when a request is accepted.
           </div>
         ) : (
-          // Scrollable container — only this box scrolls
           <div className="bg-white rounded-xl shadow overflow-y-auto max-h-[70vh]">
             <ul className="divide-y divide-gray-100">
               {conversations.map(req => {
                 const otherName = user.uid === req.requesterId
-                  ? (req.shopperName || 'Shopper')
+                  ? (req.shopperName  || 'Shopper')
                   : (req.requesterName || 'Requester');
+
+                const lastMsg = lastMsgMap[req.id];
+                const isSystemEdit = lastMsg?.system === true &&
+                  lastMsg?.text?.startsWith('📝');
+
+                // Preview text shown under the name
+                const preview = lastMsg
+                  ? isSystemEdit
+                    ? '✏️ Request was updated'
+                    : lastMsg.text?.length > 50
+                      ? lastMsg.text.slice(0, 50) + '…'
+                      : lastMsg.text
+                  : req.itemName;
 
                 return (
                   <li key={req.id}>
@@ -70,14 +105,23 @@ const MessagesPage = () => {
                       to={`/request/${req.id}`}
                       className="flex items-center gap-4 px-5 py-4 hover:bg-blue-50 transition"
                     >
+                      {/* Avatar */}
                       <div className="bg-blue-100 text-blue-600 rounded-full w-10 h-10 flex items-center justify-center font-bold text-lg flex-shrink-0">
                         {otherName[0]?.toUpperCase() || '?'}
                       </div>
-                      <div className="flex-1">
+
+                      {/* Name + preview */}
+                      <div className="flex-1 min-w-0">
                         <div className="font-semibold">{otherName}</div>
-                        <div className="text-sm text-gray-500">{req.itemName}</div>
+                        <div className={`text-sm truncate ${
+                          isSystemEdit ? 'text-amber-600 font-medium' : 'text-gray-500'
+                        }`}>
+                          {preview}
+                        </div>
                       </div>
-                      <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+
+                      {/* Status badge */}
+                      <span className={`text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 ${
                         req.status === 'Completed'
                           ? 'bg-blue-50 text-blue-600'
                           : 'bg-green-50 text-green-600'
