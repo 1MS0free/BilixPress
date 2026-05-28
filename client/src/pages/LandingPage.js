@@ -58,7 +58,7 @@ const LandingPage = () => (
             <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="#a855f7" strokeWidth="2"/><path d="M12 8v4l3 2" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </div>
           <div className="font-semibold mb-1">Safe & Verified</div>
-          <div className="text-gray-500 text-center">USTP email verification and student ID required</div>
+          <div className="text-gray-500 text-center">USTP email and student ID required</div>
         </div>
       </div>
     </section>
